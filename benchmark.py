@@ -168,7 +168,7 @@ def stop_monitoring(monitor_thread):
 
 
 # run one scenrio
-def run_scenario(scenario_name, scenario_dir, logprocessor):
+def run_scenario(scenario_name, scenario_dir, results_path, logprocessor):
     abs_scenario_path = os.path.abspath(scenario_dir)
     print("\nRunning scenario: " + abs_scenario_path)
     cwd = os.getcwd()
@@ -216,7 +216,7 @@ def run_scenario(scenario_name, scenario_dir, logprocessor):
         pslogproc.suspend()
 
         # start monitoring
-        csvresult = os.path.join(abs_scenario_path,"results",prefix + "_result.csv")
+        csvresult = os.path.join(results_path, prefix + "_result.csv")
         monitor_thread = start_monitoring(str(logproc.pid), logprocessor, csvresult)
 
         # by now the monitoring should be ready
@@ -257,7 +257,7 @@ def run_scenario(scenario_name, scenario_dir, logprocessor):
         # create the input chart
         inputdesc = scenario.get_input_description()
         if( not inputdesc is  None):
-            input_csvresult = os.path.join(abs_scenario_path,"results", "input.csv")
+            input_csvresult = os.path.join(results_path, "input.csv")
             metric = scenario.get_input_metric()
             write_metric(metric, input_csvresult, logprocessor, prefix)
             chart.createcharts(input_csvresult, inputdesc, True)
@@ -265,17 +265,17 @@ def run_scenario(scenario_name, scenario_dir, logprocessor):
         # create the output chart
         outputdesc = scenario.get_output_description()
         if( not outputdesc is  None):
-            output_csvresult = os.path.join(abs_scenario_path,"results", "output.csv")
+            output_csvresult = os.path.join(results_path, "output.csv")
             metric = scenario.get_output_metric()
             write_metric(metric, output_csvresult, logprocessor, prefix)
             chart.createcharts(output_csvresult, outputdesc, True)
 
         # serialize the description objects as well
         # per subscenario as the subtitle may change
-        pickle.dump(sdesc, open(os.path.join(abs_scenario_path,"results", prefix + "_scenario_desc.pkl"), 'wb'))
+        pickle.dump(sdesc, open(os.path.join(results_path, prefix + "_scenario_desc.pkl"), 'wb'))
         # no prefix as these should contain all scenarios
-        pickle.dump(inputdesc, open(os.path.join(abs_scenario_path,"results", "input_desc.pkl"), 'wb'))
-        pickle.dump(outputdesc, open(os.path.join(abs_scenario_path,"results", "output_desc.pkl"), 'wb'))
+        pickle.dump(inputdesc, open(os.path.join(results_path, "input_desc.pkl"), 'wb'))
+        pickle.dump(outputdesc, open(os.path.join(results_path, "output_desc.pkl"), 'wb'))
 
     os.chdir(cwd)
 
@@ -332,6 +332,7 @@ def main():
 
 def run_benchmark(scenarios, logprocessors):
     start_time = time.perf_counter()
+    dt = datetime.now().strftime("%Y%m%d_%H%M%S")
     rootdir = 'scenarios'
     scenario_elapsed = {}
     for file in os.listdir(rootdir):
@@ -343,10 +344,12 @@ def run_benchmark(scenarios, logprocessors):
             if(not scenarios is None and not file in scenarios):
                 continue # skip scenario
 
-            clear_dir(scenario_dir,'results')
+            dir_path = os.path.dirname(os.path.realpath(__file__))
+            result_dir = os.path.join(dir_path, f"results/scenario_{dt}", file)
+            os.makedirs(result_dir, exist_ok=True)
 
             # persists system information
-            write_system_info(os.path.join(scenario_dir,"results", "system_info.txt"))
+            write_system_info(os.path.join(result_dir, "system_info.txt"))
 
             # check which log processors the scenario supports
             log_processors = os.listdir( os.path.join(scenario_dir, 'config') )
@@ -357,13 +360,13 @@ def run_benchmark(scenarios, logprocessors):
                     continue # skip log processor
 
                 if(dir in 'fluent-bit'):
-                    run_scenario(str(file),scenario_dir,FLUENTBIT)
+                    run_scenario(str(file),scenario_dir,result_dir,FLUENTBIT)
                 elif(dir in 'vector'):
-                    run_scenario(str(file),scenario_dir,VECTOR)
+                    run_scenario(str(file),scenario_dir,result_dir,VECTOR)
                 elif(dir in 'stanza'):
-                    run_scenario(str(file),scenario_dir,STANZA)
+                    run_scenario(str(file),scenario_dir,result_dir,STANZA)
                 elif(dir in 'fluentd'):
-                    run_scenario(str(file),scenario_dir,FLUENTD)
+                    run_scenario(str(file),scenario_dir,result_dir,FLUENTD)
 
             scenario_elapsed_time = time.perf_counter() - scenario_start_time
             scenario_elapsed[str(file)] = scenario_elapsed_time
